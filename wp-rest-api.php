@@ -51,7 +51,6 @@ function wpcp_drop_students_table(){
 }
 
 //APIS
-
 add_action("rest_api_init", function(){
 
     //get all students
@@ -62,8 +61,8 @@ add_action("rest_api_init", function(){
     ]);
 
     //Create student API - POST(name, email, phone_no)
-    resgister_rest_route("students/v1", "student", [
-        "method" => "POST",
+    register_rest_route("students/v1", "student", [
+        "methods" => "POST",
         "callback" => "wp_handle_create_student",
         "args" => [
             "name" => [
@@ -78,11 +77,32 @@ add_action("rest_api_init", function(){
                 "required" => false,
                 "type" => "string",
             ],
+        ]    
 
     ]);
 
+    //update student API - PUT (name, email, phone_no) -> id - url
+    register_rest_route("students/v1", "student/(?P<id>\d+)", [
+        "methods" => "PUT",
+        "callback" => "wp_handle_update_student",
+        "args" => [
+            "name",
+            "email",
+            "phone_no",
+        ]
+    ]);
+      
+    //Delete student API - DELETE-> ID-> url -> D
+    register_rest_route("students/v1", "student/(?P<id>\d+)", [
+        "methods" => "DELETE",
+        "callback" => "wp_handle_student_delete",
+
+    ]);
+
+
 });
 
+//list data
 function wp_handle_student_list(){
     global $wpdb;
 
@@ -95,3 +115,100 @@ function wp_handle_student_list(){
         "data" => $students
     ]);
 };
+
+//create data
+function wp_handle_create_student($request){
+
+    global $wpdb;
+    $tableName = $wpdb->prefix . "students";
+   
+
+    $name = $request->get_param("name");
+    $email = $request->get_param("email");
+    $phone_no = $request->get_param("phone_no");
+
+    $wpdb->insert($tableName, [
+        "name" => $name,
+        "email" => $email,
+        "phone_no" => $phone_no
+    ]);
+
+    return rest_ensure_response([
+        "status" => true,
+        "message" => "Student created successfully",
+
+    ]);
+
+}
+
+//update student 
+function wp_handle_update_student($request){
+   
+    global $wpdb;
+    $tableName = $wpdb->prefix . "students";
+
+    $student_id = $request->get_param("id");
+
+    if(!empty($student_id)){
+
+        $studentData = $wpdb->get_row("SELECT * FROM {$tableName} WHERE id = {$student_id}", ARRAY_A);
+        if(!empty($studentData)){
+            //student exists
+            $wpdb->update($tableName, [
+                "name" => $request->get_param("name") ?? $studentData['name'],
+                "email" => $request->get_param("email") ?? $studentData['email'],
+                "phone_no" => $request->get_param("phone_no") ?? $studentData['phone_no'],
+            
+            ],
+                ["id" => $student_id],
+            );
+
+            return rest_ensure_response([
+                "status" => true,
+                "message" => "Student updated successfully",
+            ]);
+
+        }else {
+            return rest_ensure_response([
+                "status" => false,
+                "message" => "Failde to get student data",
+        
+            ]);
+        }
+
+
+    }else {
+           return rest_ensure_response([
+            "status" => false,
+            "message" => "Student ID is required",
+          ]);
+        }
+     
+
+};
+
+//Delete student
+function wp_handle_student_delete($request){
+
+    global $wpdb;
+    $tableName = $wpdb->prefix . "students";
+
+    $student_id = $request->get_param("id");
+
+    $studentData = $wpdb->get_row("SELECT * FROM {$tableName} WHERE id = {$student_id}", ARRAY_A);
+
+    if(!empty($studentData)){
+        $wpdb->delete($tableName, ["id" => $student_id]);
+        return rest_ensure_response([
+            "status" => true,
+            "message" => "Student deleted successfully",
+        ]);
+    }else{
+        return rest_ensure_response([
+            "status" => false,
+            "message" => "Student not found",
+        ]);
+    }
+
+};
+
